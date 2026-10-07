@@ -158,7 +158,7 @@ function renderPreview(title, cat, summary) {
         <h1 class="article__title">${escapeHtml(title || "")}</h1>
         ${summary ? `<p style="color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:6px">${escapeHtml(summary)}</p>` : ""}
         <div class="article__meta">
-          <span>Источник: championat.com</span>
+          <span>Спортивные новости</span>
         </div>
       </div>
       <div class="article__content">
@@ -176,15 +176,12 @@ function renderPreviewFallback(title, cat, summary, url) {
         <h1 class="article__title">${escapeHtml(title || "")}</h1>
         ${summary ? `<p style="color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:6px">${escapeHtml(summary)}</p>` : ""}
         <div class="article__meta">
-          <span>Источник: championat.com</span>
+          <span>Спортивные новости</span>
         </div>
       </div>
       <div class="article__content">
-        <p style="color:var(--muted)">Не удалось загрузить полный текст статьи. Открой оригинал по ссылке ниже.</p>
+        <p style="color:var(--muted)">Полный текст недоступен.</p>
       </div>
-      <a class="article__source" href="${escapeHtml(url)}" target="_blank" rel="noopener">
-        Открыть оригинал на championat.com ↗
-      </a>
     </article>
   `;
 }
@@ -210,23 +207,18 @@ function renderArticle(data, fallbackTitle, fallbackCat, fallbackSummary) {
         <h1 class="article__title">${escapeHtml(title)}</h1>
         ${summary && !image ? `<p style="color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:6px">${escapeHtml(summary)}</p>` : ""}
         <div class="article__meta">
-          <span>Источник: championat.com</span>
+          <span>Спортивные новости</span>
         </div>
       </div>
       <div class="article__content">
-        ${content || "<p>Не удалось извлечь текст статьи.</p>"}
+        ${content || "<p>Полный текст недоступен.</p>"}
       </div>
-      <a class="article__source" href="${escapeHtml(data.url)}" target="_blank" rel="noopener">
-        Открыть оригинал на championat.com ↗
-      </a>
     </article>
   `;
 }
 
 async function openNews(url, title, cat, summary) {
   openModal();
-
-  // Показываем мгновенно превью из RSS
   modalBody.innerHTML = renderPreview(title, cat, summary);
 
   try {
@@ -234,7 +226,6 @@ async function openNews(url, title, cat, summary) {
     if (!res.ok) throw new Error("bad response");
     const data = await res.json();
 
-    // Если пришли пустые абзацы и нет картинки — считаем, что не загрузилось
     const hasContent = (data.paragraphs || []).length > 0;
     if (!hasContent && !data.image) {
       throw new Error("no content");
@@ -244,12 +235,10 @@ async function openNews(url, title, cat, summary) {
     modalBody.scrollTop = 0;
   } catch (e) {
     console.error(e);
-    // Оставляем превью + кнопку «Открыть оригинал»
     modalBody.innerHTML = renderPreviewFallback(title, cat, summary, url);
   }
 }
 
-// Клик по карточке новости
 document.addEventListener("click", (e) => {
   const card = e.target.closest(".news-card");
   if (card) {
@@ -267,7 +256,6 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// Esc закрывает
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !modal.hidden) closeModal();
 });

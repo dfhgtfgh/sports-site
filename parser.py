@@ -2,6 +2,7 @@
 Парсер матчей и новостей с championat.com
 Матчи — через Playwright (эмуляция браузера, JS рендеринг)
 Новости — через RSS championat.com + полный текст статьи через Playwright
+С фильтрацией букмекерского контента (для модерации ВК)
 """
 import re
 import time
@@ -42,8 +43,72 @@ MATCHES_TTL = 180
 ARTICLE_TTL = 3600  # 1 час
 
 
-def _is_fresh(key, ttl):
-    return _cache[key]["data"] is not None and (time.time() - _cache[key]["ts"]) < ttl
+# ============================================================
+#        ФИЛЬТРАЦИЯ БУКМЕКЕРСКОГО КОНТЕНТА (для ВК-модерации)
+# ============================================================
+_BOOKMAKER_BRANDS = [
+    "фонбет", "fonbet",
+    "olimpbet", "олимпбет",
+    "winline", "винлайн",
+    "бетсити", "betcity",
+    "париматч", "parimatch",
+    "лига ставок", "лигаставок",
+    "1xставка", "1xstavka", "1хставка",
+    "марафонбет", "marathonbet",
+    "betboom", "бетбум",
+    "леонбет", "leonbet",
+    "tennisi", "тенниси",
+    "melbet", "мелбет",
+    "bet365",
+    "pin-up", "пин-ап", "пинап",
+    "покердом",
+    "pari.ru", "пари.ру",
+    "зенитбет",
+]
+
+_BET_KEYWORDS = [
+    "букмекер",
+    "тотализатор",
+    "казино",
+    "ставк",
+    "коэффициент",
+    "прогноз на матч",
+    "прогнозы на спорт",
+    "пари на",
+    "игорн",
+    "азартн",
+    "букмекерский",
+    "беттинг",
+    "экспресс-ставк",
+    "игровые автоматы",
+]
+
+
+def _contains_bet_content(text):
+    """Проверяет, содержит ли текст букмекерский контент."""
+    if not text:
+        return False
+    low = text.lower()
+    for kw in _BET_KEYWORDS:
+        if kw in low:
+            return True
+    for brand in _BOOKMAKER_BRANDS:
+        if brand in low:
+            return True
+    return False
+
+
+def _strip_bookmaker_brands(text):
+    """Убирает бренды букмекеров из текста (для названий турниров)."""
+    if not text:
+        return text
+    for brand in _BOOKMAKER_BRANDS:
+        pattern = re.compile(re.escape(brand), re.IGNORECASE)
+        text = pattern.sub("", text)
+    # Убираем двойные пробелы и висящие разделители
+    text = re.sub(r"\s{2,}", " ", text)
+    text = text.strip(" -–—·,.")
+    return text.strip()
 
 
 # ============================================================
@@ -57,12 +122,19 @@ def fetch_news(category="all", limit=25):
         for cat, url in RSS_FEEDS.items():
             try:
                 feed = feedparser.parse(url)
-                for entry in feed.entries[:15]:
+                for entry in feed.entries[:20]:
+                    title = entry.get("title", "").strip()
+                    summary = _clean_summary(entry.get("summary", ""))
+
+                    # Пропускаем всё, что связано с букмекерами/ставками
+                    if _contains_bet_content(title) or _contains_bet_content(summary):
+                        continue
+
                     all_news.append({
                         "category": cat,
-                        "title": entry.get("title", "").strip(),
+                        "title": title,
                         "link": entry.get("link", ""),
-                        "summary": _clean_summary(entry.get("summary", "")),
+                        "summary": summary,
                         "published_ts": _parse_published(entry),
                     })
             except Exception as e:
@@ -238,6 +310,12 @@ def _extract_livetable_event(li, sport, sport_title, tournament):
         status_el = li.select_one(".livetable-event__status")
         status = status_el.get_text(strip=True) if status_el else ""
 
+        # Чистим бренды букмекеров из турнира и вида спорта
+        tournament = _strip_bookmaker_brands(tournament)
+        sport_title = _strip_bookmaker_brands(sport_title)
+        home = _strip_bookmaker_brands(home)
+        away = _strip_bookmaker_brands(away)
+
         is_live = bool(re.search(r"период|сет|четверт|тайм|Идёт|\d+'", status))
 
         return {
@@ -294,10 +372,16 @@ def _parse_seo_results(soup):
                     home = parts[0].strip() if parts else link_text
                     away = parts[1].strip() if len(parts) > 1 else ""
 
+                # Чистим бренды букмекеров
+                tournament_clean = _strip_bookmaker_brands(current_tournament)
+                sport_clean = _strip_bookmaker_brands(current_sport)
+                home = _strip_bookmaker_brands(home)
+                away = _strip_bookmaker_brands(away)
+
                 results.append({
-                    "sport": _sport_key_from_title(current_sport),
-                    "sport_title": current_sport,
-                    "tournament": current_tournament,
+                    "sport": _sport_key_from_title(sport_clean),
+                    "sport_title": sport_clean,
+                    "tournament": tournament_clean,
                     "home": home,
                     "away": away,
                     "score": score or "-",
@@ -337,7 +421,7 @@ def _sport_key_from_title(title):
 # ============================================================
 def fetch_article(url):
     """Скачивает статью через Playwright (отрабатывает JS-редиректы)
-    и возвращает заголовок, картинку, абзацы."""
+    и возвращает заголовок, картинку, абзацы. Фильтрует букмекерский контент."""
     if not url or "championat.com" not in url:
         return None
 
@@ -397,17 +481,20 @@ def fetch_article(url):
                 continue
             if text.startswith(("Читайте также", "Реклама", "18+")):
                 continue
+            # Пропускаем абзацы с букмекерским контентом
+            if _contains_bet_content(text):
+                continue
             paragraphs.append({
                 "type": "h" if el.name in ("h2", "h3") else "p",
                 "text": text,
             })
 
     if not paragraphs:
-        if description:
+        if description and not _contains_bet_content(description):
             paragraphs.append({"type": "p", "text": description})
         for p in soup.find_all("p")[:20]:
             text = p.get_text(" ", strip=True)
-            if len(text) >= 40:
+            if len(text) >= 40 and not _contains_bet_content(text):
                 paragraphs.append({"type": "p", "text": text})
 
     data = {
@@ -444,7 +531,6 @@ def _fetch_article_html_playwright(url):
         try:
             page.goto(url, timeout=45000, wait_until="domcontentloaded")
 
-            # Ждём либо типичные блоки статьи, либо окончания редиректа
             try:
                 page.wait_for_selector(
                     "h1, .article__body, [itemprop='articleBody']",
@@ -453,7 +539,6 @@ def _fetch_article_html_playwright(url):
             except Exception:
                 pass
 
-            # Дополнительная пауза, чтобы все редиректы и AJAX отработали
             page.wait_for_timeout(2500)
 
             html = page.content()
