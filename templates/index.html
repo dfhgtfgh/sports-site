@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e17">
+<title>SportHub — матчи и новости на сегодня</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="header">
+  <div class="container header__inner">
+    <a href="/" class="logo">
+      <span class="logo__icon">⚡</span>
+      <span class="logo__text">Sport<span>Hub</span></span>
+    </a>
+
+    <nav class="nav" id="nav">
+      <button class="nav__btn active" data-cat="all">Все</button>
+      <button class="nav__btn" data-cat="football">⚽ Футбол</button>
+      <button class="nav__btn" data-cat="hockey">🏒 Хоккей</button>
+      <button class="nav__btn" data-cat="basketball">🏀 Баскетбол</button>
+      <button class="nav__btn" data-cat="tennis">🎾 Теннис</button>
+    </nav>
+
+    <div class="header__status">
+      <span class="pulse"></span>
+      <span id="last-update">обновление...</span>
+    </div>
+  </div>
+</header>
+
+<!-- Live bar -->
+<div class="livebar" id="livebar">
+  <div class="livebar__label">LIVE</div>
+  <div class="livebar__track" id="livebar-track">
+    <span class="livebar__empty">Загрузка live-матчей...</span>
+  </div>
+</div>
+
+<!-- Мобильные табы -->
+<div class="mobile-tabs" id="mobile-tabs">
+  <button class="mobile-tab active" data-tab="matches">🔥 Матчи</button>
+  <button class="mobile-tab" data-tab="news">📰 Новости</button>
+</div>
+
+<main class="container main" id="main">
+
+  <section class="matches" data-tab-panel="matches">
+    <div class="section-head">
+      <h2>🔥 Матчи на сегодня</h2>
+      <span class="badge" id="matches-count">—</span>
+    </div>
+    <div class="matches__grid" id="matches-grid">
+      <div class="loader">Загрузка матчей...</div>
+    </div>
+  </section>
+
+  <aside class="news" data-tab-panel="news">
+    <div class="section-head">
+      <h2>📰 Новости</h2>
+      <button class="refresh-btn" id="refresh-news" title="Обновить">⟳</button>
+    </div>
+    <div class="news__list" id="news-list">
+      <div class="loader">Загрузка новостей...</div>
+    </div>
+  </aside>
+
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <p>Данные: <a href="https://www.championat.com/" target="_blank" rel="noopener">championat.com</a> · SportHub © 2026</p>
+  </div>
+</footer>
+
+<!-- Модалка для новостей -->
+<div class="modal" id="news-modal" hidden>
+  <div class="modal__overlay" data-close-modal></div>
+  <div class="modal__content">
+    <button class="modal__close" data-close-modal aria-label="Закрыть">✕</button>
+    <div class="modal__body" id="news-modal-body">
+      <div class="modal__loader">Загрузка статьи…</div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
